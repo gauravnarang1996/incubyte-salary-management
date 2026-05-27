@@ -22,3 +22,8 @@ def test_create_employee_api():
     )
 
     assert response.status_code == 201
+
+
+@pytest.mark.django_db
+def test_country_salary_insights():
+    ...

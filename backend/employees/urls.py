@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from .views import EmployeeViewSet
+from .views import EmployeeViewSet, country_salary_insights, job_title_salary_insights
 
 router = DefaultRouter()
 
@@ -13,4 +13,13 @@ router.register(
 
 urlpatterns = [
     path("", include(router.urls)),
+    path(
+        "insights/country/",
+        country_salary_insights
+    ),
+
+    path(
+        "insights/job-title/",
+        job_title_salary_insights
+    ),
 ]
