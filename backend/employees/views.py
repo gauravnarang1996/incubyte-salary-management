@@ -2,7 +2,7 @@ from django.shortcuts import render
 from rest_framework import viewsets
 from .models import Employee
 from .serializers import EmployeeSerializer
-from django.db.models import Avg, Min, Max, Count
+from django.db.models import Avg, Min, Max, Count, Sum
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 # Create your views here.
@@ -50,6 +50,30 @@ def job_title_salary_insights(request):
         .values("country", "job_title")
         .annotate(
             avg_salary=Avg("salary")
+        )
+    )
+
+    return Response(data)
+
+
+@api_view(["GET"])
+def payroll_cost(request):
+
+    total = Employee.objects.aggregate(
+        total_payroll=Sum("salary")
+    )
+
+    return Response(total)
+
+
+@api_view(["GET"])
+def employees_by_country(request):
+
+    data = (
+        Employee.objects
+        .values("country")
+        .annotate(
+            count=Count("id")
         )
     )
 
