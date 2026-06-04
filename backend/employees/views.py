@@ -78,3 +78,38 @@ def employees_by_country(request):
     )
 
     return Response(data)
+
+@api_view(["GET"])
+def dashboard_metrics(request):
+
+    total_employees = Employee.objects.count()
+
+    avg_salary = (
+        Employee.objects.aggregate(
+            avg_salary=Avg("salary")
+        )
+    )
+
+    countries = (
+        Employee.objects
+        .values("country")
+        .distinct()
+        .count()
+    )
+
+    payroll = (
+        Employee.objects.aggregate(
+            payroll=Sum("salary")
+        )
+    )
+
+    return Response({
+        "total_employees":
+            total_employees,
+        "avg_salary":
+            avg_salary["avg_salary"],
+        "countries":
+            countries,
+        "payroll":
+            payroll["payroll"]
+    })

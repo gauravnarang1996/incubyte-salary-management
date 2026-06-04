@@ -30,5 +30,10 @@ urlpatterns = [
     path(
         "insights/employees-by-country/",
         employees_by_country
-),
+    ),
+    path(
+    "dashboard/",
+    dashboard_metrics
+        ),
+
 ]
