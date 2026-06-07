@@ -59,9 +59,9 @@ function formFromEmployee(employee: Employee): EmployeeForm {
   };
 }
 
-function messageFromResponse(body: string) {
+function messageFromResponse(body: string, fallback: string) {
   if (!body) {
-    return "Unable to save employee";
+    return fallback;
   }
 
   try {
@@ -91,6 +91,7 @@ export default function EmployeeManager() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const totalPages = Math.max(1, Math.ceil(totalEmployees / pageSize));
 
@@ -164,20 +165,24 @@ export default function EmployeeManager() {
     setEditingEmployee(employee);
     setForm(formFromEmployee(employee));
     setError("");
+    setNotice("");
   }
 
   function cancelEdit() {
     setEditingEmployee(null);
     setForm(emptyForm);
     setError("");
+    setNotice("");
   }
 
   async function submitEmployee(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError("");
+    setNotice("");
 
     const isEditing = editingEmployee !== null;
+    const employeeName = `${form.first_name} ${form.last_name}`.trim();
     const url = isEditing
       ? `/api/employees/${editingEmployee.id}`
       : "/api/employees";
@@ -195,12 +200,22 @@ export default function EmployeeManager() {
       });
 
       if (!response.ok) {
-        throw new Error(messageFromResponse(await response.text()));
+        throw new Error(
+          messageFromResponse(
+            await response.text(),
+            isEditing ? "Unable to update employee" : "Unable to add employee"
+          )
+        );
       }
 
       setForm(emptyForm);
       setEditingEmployee(null);
       await loadEmployees();
+      setNotice(
+        isEditing
+          ? `${employeeName} updated successfully.`
+          : `${employeeName} added successfully.`
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -210,6 +225,7 @@ export default function EmployeeManager() {
 
   async function deleteEmployee(employee: Employee) {
     setError("");
+    setNotice("");
     setDeletingId(employee.id);
 
     try {
@@ -218,7 +234,12 @@ export default function EmployeeManager() {
       });
 
       if (!response.ok) {
-        throw new Error(messageFromResponse(await response.text()));
+        throw new Error(
+          messageFromResponse(
+            await response.text(),
+            "Unable to delete employee"
+          )
+        );
       }
 
       if (editingEmployee?.id === employee.id) {
@@ -226,6 +247,7 @@ export default function EmployeeManager() {
       }
 
       await loadEmployees();
+      setNotice(`${employee.full_name} deleted successfully.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to delete employee");
     } finally {
@@ -298,6 +320,11 @@ export default function EmployeeManager() {
             {error ? (
               <span className="max-w-xl text-xs text-destructive">
                 {error}
+              </span>
+            ) : null}
+            {!error && notice ? (
+              <span className="max-w-xl text-xs text-emerald-700">
+                {notice}
               </span>
             ) : null}
           </div>
