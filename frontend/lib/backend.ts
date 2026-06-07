@@ -32,6 +32,13 @@ export async function proxyToBackend(
     backendUrl(path, incomingUrl.search),
     init
   );
+
+  if ([204, 205, 304].includes(response.status)) {
+    return new Response(null, {
+      status: response.status,
+    });
+  }
+
   const body = await response.text();
 
   return new Response(body, {
