@@ -246,8 +246,17 @@ export default function EmployeeManager() {
         cancelEdit();
       }
 
-      await loadEmployees();
+      setEmployees((current) =>
+        current.filter((item) => item.id !== employee.id)
+      );
+      setTotalEmployees((current) => Math.max(0, current - 1));
       setNotice(`${employee.full_name} deleted successfully.`);
+
+      if (employees.length === 1 && page > 1) {
+        setPage((current) => Math.max(1, current - 1));
+      } else {
+        void loadEmployees();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to delete employee");
     } finally {
