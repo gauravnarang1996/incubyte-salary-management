@@ -1,29 +1,65 @@
-from django.shortcuts import render
 from rest_framework import viewsets
+from rest_framework.filters import OrderingFilter, SearchFilter
 from .models import Employee
 from .serializers import EmployeeSerializer
 from django.db.models import Avg, Min, Max, Count, Sum
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-# Create your views here.
+from django_filters.rest_framework import DjangoFilterBackend
 
+
+class EmployeeSearchFilter(SearchFilter):
+    def get_search_terms(self, request):
+        search_terms = super().get_search_terms(request)
+
+        if search_terms:
+            return search_terms
+
+        q = request.query_params.get("q", "")
+        return q.replace("\x00", "").replace(",", " ").split()
+
+# Create your views here.
 class EmployeeViewSet(viewsets.ModelViewSet):
 
     queryset = Employee.objects.all().order_by("id")
 
     serializer_class = EmployeeSerializer
 
+    filter_backends = [
+        DjangoFilterBackend,
+        EmployeeSearchFilter,
+        OrderingFilter,
+    ]
+
     filterset_fields = [
         "country",
         "job_title",
-        "department"
+        "department",
+        "is_active",
     ]
 
     search_fields = [
         "first_name",
         "last_name",
-        "email"
+        "email",
+        "job_title",
+        "country",
+        "department",
     ]
+
+    ordering_fields = [
+        "id",
+        "first_name",
+        "last_name",
+        "job_title",
+        "country",
+        "department",
+        "salary",
+        "date_joined",
+        "created_at",
+    ]
+
+    ordering = ["id"]
 
 @api_view(["GET"])
 def country_salary_insights(request):
