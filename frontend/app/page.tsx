@@ -1,66 +1,111 @@
-import Image from "next/image";
-import AddEmployee
-from "@/components/AddEmployee";
-export default function Home() {
+import Link from "next/link";
+import { BarChart3, DollarSign, Globe2, Users } from "lucide-react";
+
+import SalaryChart from "@/components/SalaryChart";
+import { Button } from "@/components/ui/button";
+import { backendUrl } from "@/lib/backend";
+import type { DashboardMetrics } from "@/lib/types";
+
+const fallbackMetrics: DashboardMetrics = {
+  total_employees: 0,
+  avg_salary: null,
+  countries: 0,
+  payroll: null,
+};
+
+function formatCurrency(value: number | null) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value ?? 0);
+}
+
+async function getMetrics() {
+  try {
+    const response = await fetch(backendUrl("/dashboard/"), {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return fallbackMetrics;
+    }
+
+    return (await response.json()) as DashboardMetrics;
+  } catch {
+    return fallbackMetrics;
+  }
+}
+
+export default async function Home() {
+  const metrics = await getMetrics();
+  const cards = [
+    {
+      label: "Employees",
+      value: metrics.total_employees.toLocaleString(),
+      icon: Users,
+    },
+    {
+      label: "Average salary",
+      value: formatCurrency(metrics.avg_salary),
+      icon: BarChart3,
+    },
+    {
+      label: "Countries",
+      value: metrics.countries.toLocaleString(),
+      icon: Globe2,
+    },
+    {
+      label: "Payroll",
+      value: formatCurrency(metrics.payroll),
+      icon: DollarSign,
+    },
+  ];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-normal">
+            Salary Management
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            Monitor payroll, compensation spread, and workforce distribution.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <Button asChild>
+          <Link href="/employees">
+            <Users />
+            Manage employees
+          </Link>
+        </Button>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {cards.map((card) => {
+          const Icon = card.icon;
+
+          return (
+            <article key={card.label} className="rounded-lg border bg-card p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {card.label}
+                </span>
+                <Icon className="size-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-semibold">{card.value}</p>
+            </article>
+          );
+        })}
+      </section>
+
+      <section className="rounded-lg border bg-card p-4">
+        <div className="mb-4">
+          <h2 className="text-sm font-medium">Average salary by country</h2>
         </div>
-      </main>
-    </div>
+        <SalaryChart />
+      </section>
+    </main>
   );
 }

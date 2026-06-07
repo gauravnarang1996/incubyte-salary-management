@@ -9,17 +9,20 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <nav className="p-4 border-b">
-          <Link
-            href="/"
-            className="mr-4"
-          >
-            Dashboard
-          </Link>
+        <nav className="border-b px-4 py-3 sm:px-6 lg:px-8">
+          <div className="mx-auto flex max-w-7xl items-center gap-4 text-sm font-medium">
+            <Link href="/">
+              Dashboard
+            </Link>
 
-          <Link href="/employees">
-            Employees
-          </Link>
+            <Link href="/employees">
+              Employees
+            </Link>
+
+            <Link href="/insights">
+              Insights
+            </Link>
+          </div>
         </nav>
 
         {children}

@@ -10,13 +10,15 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import type { CountryInsight } from "@/lib/types";
 
 export default function SalaryChart() {
-  const [data, setData] = useState([]);
+  const [data, setData] =
+    useState<CountryInsight[]>([]);
 
   useEffect(() => {
     fetch(
-      "http://127.0.0.1:8000/api/insights/country/"
+      "/api/insights/country"
     )
       .then((res) => res.json())
       .then((data) => setData(data));
@@ -34,7 +36,7 @@ export default function SalaryChart() {
 
         <Tooltip />
 
-        <Bar dataKey="avg_salary" />
+        <Bar dataKey="avg_salary" fill="var(--primary)" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
