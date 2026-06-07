@@ -6,6 +6,13 @@ from django.db.models import Avg, Min, Max, Count, Sum
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.pagination import PageNumberPagination
+
+
+class EmployeePagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 100
 
 
 class EmployeeSearchFilter(SearchFilter):
@@ -24,6 +31,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.all().order_by("id")
 
     serializer_class = EmployeeSerializer
+
+    pagination_class = EmployeePagination
 
     filter_backends = [
         DjangoFilterBackend,

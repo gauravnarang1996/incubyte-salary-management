@@ -7,11 +7,23 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { Employee } from "@/lib/types";
+import type { Employee, PaginatedResponse } from "@/lib/types";
+
+const pageSize = 20;
 
 const emptyForm = {
   first_name: "",
@@ -23,6 +35,8 @@ const emptyForm = {
   salary: "",
 };
 
+type EmployeeForm = typeof emptyForm;
+
 function formatCurrency(value: string | number | null) {
   const amount = Number(value ?? 0);
 
@@ -33,51 +47,89 @@ function formatCurrency(value: string | number | null) {
   }).format(amount);
 }
 
+function formFromEmployee(employee: Employee): EmployeeForm {
+  return {
+    first_name: employee.first_name,
+    last_name: employee.last_name,
+    email: employee.email,
+    job_title: employee.job_title,
+    country: employee.country,
+    department: employee.department,
+    salary: employee.salary,
+  };
+}
+
+function messageFromResponse(body: string) {
+  if (!body) {
+    return "Unable to save employee";
+  }
+
+  try {
+    const parsed = JSON.parse(body) as Record<string, string[] | string>;
+
+    return Object.entries(parsed)
+      .map(([field, value]) => {
+        const text = Array.isArray(value) ? value.join(" ") : value;
+        return `${field.replace("_", " ")}: ${text}`;
+      })
+      .join(" ");
+  } catch {
+    return body;
+  }
+}
+
 export default function EmployeeManager() {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [totalEmployees, setTotalEmployees] = useState(0);
   const [query, setQuery] = useState("");
   const [country, setCountry] = useState("");
   const [department, setDepartment] = useState("");
-  const [form, setForm] = useState(emptyForm);
+  const [page, setPage] = useState(1);
+  const [form, setForm] = useState<EmployeeForm>(emptyForm);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState("");
 
-  const countries = useMemo(
-    () =>
-      Array.from(
-        new Set(employees.map((employee) => employee.country))
-      ).sort(),
-    [employees]
-  );
+  const totalPages = Math.max(1, Math.ceil(totalEmployees / pageSize));
 
-  const departments = useMemo(
-    () =>
-      Array.from(
-        new Set(employees.map((employee) => employee.department))
-      ).sort(),
-    [employees]
-  );
+  const visibleRange = useMemo(() => {
+    if (totalEmployees === 0) {
+      return "0";
+    }
+
+    const start = (page - 1) * pageSize + 1;
+    const end = Math.min(page * pageSize, totalEmployees);
+
+    return `${start}-${end}`;
+  }, [page, totalEmployees]);
+
+  const resetToFirstPage = useCallback(() => {
+    setPage(1);
+  }, []);
 
   const loadEmployees = useCallback(async () => {
     setLoading(true);
     setError("");
 
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({
+      ordering: "first_name",
+      page: String(page),
+      page_size: String(pageSize),
+    });
 
     if (query.trim()) {
       params.set("q", query.trim());
     }
 
-    if (country) {
-      params.set("country", country);
+    if (country.trim()) {
+      params.set("country", country.trim());
     }
 
-    if (department) {
-      params.set("department", department);
+    if (department.trim()) {
+      params.set("department", department.trim());
     }
-
-    params.set("ordering", "first_name");
 
     try {
       const response = await fetch(`/api/employees?${params}`);
@@ -86,27 +138,53 @@ export default function EmployeeManager() {
         throw new Error("Unable to load employees");
       }
 
-      setEmployees(await response.json());
+      const data = (await response.json()) as PaginatedResponse<Employee>;
+      setEmployees(data.results);
+      setTotalEmployees(data.count);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
-  }, [country, department, query]);
+  }, [country, department, page, query]);
 
   useEffect(() => {
     const timeout = window.setTimeout(loadEmployees, 250);
     return () => window.clearTimeout(timeout);
   }, [loadEmployees]);
 
-  async function createEmployee(event: FormEvent<HTMLFormElement>) {
+  function updateForm(field: keyof EmployeeForm, value: string) {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  function startEdit(employee: Employee) {
+    setEditingEmployee(employee);
+    setForm(formFromEmployee(employee));
+    setError("");
+  }
+
+  function cancelEdit() {
+    setEditingEmployee(null);
+    setForm(emptyForm);
+    setError("");
+  }
+
+  async function submitEmployee(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError("");
 
+    const isEditing = editingEmployee !== null;
+    const url = isEditing
+      ? `/api/employees/${editingEmployee.id}`
+      : "/api/employees";
+
     try {
-      const response = await fetch("/api/employees", {
-        method: "POST",
+      const response = await fetch(url, {
+        method: isEditing ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
         },
@@ -117,11 +195,11 @@ export default function EmployeeManager() {
       });
 
       if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(detail || "Unable to add employee");
+        throw new Error(messageFromResponse(await response.text()));
       }
 
       setForm(emptyForm);
+      setEditingEmployee(null);
       await loadEmployees();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -130,21 +208,29 @@ export default function EmployeeManager() {
     }
   }
 
-  async function deleteEmployee(id: number) {
+  async function deleteEmployee(employee: Employee) {
     setError("");
+    setDeletingId(employee.id);
 
-    const response = await fetch(`/api/employees/${id}`, {
-      method: "DELETE",
-    });
+    try {
+      const response = await fetch(`/api/employees/${employee.id}`, {
+        method: "DELETE",
+      });
 
-    if (!response.ok) {
-      setError("Unable to delete employee");
-      return;
+      if (!response.ok) {
+        throw new Error(messageFromResponse(await response.text()));
+      }
+
+      if (editingEmployee?.id === employee.id) {
+        cancelEdit();
+      }
+
+      await loadEmployees();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete employee");
+    } finally {
+      setDeletingId(null);
     }
-
-    setEmployees((current) =>
-      current.filter((employee) => employee.id !== id)
-    );
   }
 
   return (
@@ -165,35 +251,30 @@ export default function EmployeeManager() {
             className="pl-8"
             placeholder="Search name, email, role, country"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              resetToFirstPage();
+            }}
           />
         </label>
 
-        <select
-          className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+        <Input
+          placeholder="Country filter"
           value={country}
-          onChange={(event) => setCountry(event.target.value)}
-        >
-          <option value="">All countries</option>
-          {countries.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+          onChange={(event) => {
+            setCountry(event.target.value);
+            resetToFirstPage();
+          }}
+        />
 
-        <select
-          className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+        <Input
+          placeholder="Department filter"
           value={department}
-          onChange={(event) => setDepartment(event.target.value)}
-        >
-          <option value="">All departments</option>
-          {departments.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+          onChange={(event) => {
+            setDepartment(event.target.value);
+            resetToFirstPage();
+          }}
+        />
 
         <Button
           type="button"
@@ -208,19 +289,21 @@ export default function EmployeeManager() {
 
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="overflow-hidden rounded-lg border bg-card">
-          <div className="flex h-12 items-center justify-between border-b px-4">
+          <div className="flex min-h-12 flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-sm font-medium">
-              {loading ? "Loading employees" : `${employees.length} employees`}
+              {loading
+                ? "Loading employees"
+                : `${visibleRange} of ${totalEmployees.toLocaleString()} employees`}
             </h2>
             {error ? (
-              <span className="max-w-xl truncate text-xs text-destructive">
+              <span className="max-w-xl text-xs text-destructive">
                 {error}
               </span>
             ) : null}
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[840px] text-sm">
+            <table className="w-full min-w-[920px] text-sm">
               <thead className="bg-muted/60 text-left text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 font-medium">Name</th>
@@ -246,16 +329,28 @@ export default function EmployeeManager() {
                     <td className="px-4 py-3 text-right">
                       {formatCurrency(employee.salary)}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button
-                        type="button"
-                        size="icon-sm"
-                        variant="destructive"
-                        aria-label={`Delete ${employee.full_name}`}
-                        onClick={() => deleteEmployee(employee.id)}
-                      >
-                        <Trash2 />
-                      </Button>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="icon-sm"
+                          variant="outline"
+                          aria-label={`Edit ${employee.full_name}`}
+                          onClick={() => startEdit(employee)}
+                        >
+                          <Pencil />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon-sm"
+                          variant="destructive"
+                          aria-label={`Delete ${employee.full_name}`}
+                          disabled={deletingId === employee.id}
+                          onClick={() => deleteEmployee(employee)}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -273,39 +368,120 @@ export default function EmployeeManager() {
               </tbody>
             </table>
           </div>
+
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={loading || page <= 1}
+            >
+              <ChevronLeft />
+              Previous
+            </Button>
+
+            <span className="text-sm text-muted-foreground">
+              Page {page} of {totalPages}
+            </span>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setPage((current) => Math.min(totalPages, current + 1))
+              }
+              disabled={loading || page >= totalPages}
+            >
+              Next
+              <ChevronRight />
+            </Button>
+          </div>
         </div>
 
         <form
           className="rounded-lg border bg-card p-4"
-          onSubmit={createEmployee}
+          onSubmit={submitEmployee}
         >
-          <div className="mb-4 flex items-center gap-2">
-            <Plus className="size-4" />
-            <h2 className="text-sm font-medium">Add employee</h2>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {editingEmployee ? (
+                <Pencil className="size-4" />
+              ) : (
+                <Plus className="size-4" />
+              )}
+              <h2 className="text-sm font-medium">
+                {editingEmployee ? "Edit employee" : "Add employee"}
+              </h2>
+            </div>
+
+            {editingEmployee ? (
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Cancel edit"
+                onClick={cancelEdit}
+              >
+                <X />
+              </Button>
+            ) : null}
           </div>
 
           <div className="grid gap-3">
-            {Object.keys(emptyForm).map((key) => (
-              <Input
-                key={key}
-                required
-                type={key === "salary" ? "number" : "text"}
-                min={key === "salary" ? 0 : undefined}
-                placeholder={key.replace("_", " ")}
-                value={form[key as keyof typeof form]}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    [key]: event.target.value,
-                  }))
-                }
-              />
-            ))}
+            <Input
+              required
+              placeholder="First name"
+              value={form.first_name}
+              onChange={(event) => updateForm("first_name", event.target.value)}
+            />
+            <Input
+              required
+              placeholder="Last name"
+              value={form.last_name}
+              onChange={(event) => updateForm("last_name", event.target.value)}
+            />
+            <Input
+              required
+              type="email"
+              placeholder="name@example.com"
+              value={form.email}
+              onChange={(event) => updateForm("email", event.target.value)}
+            />
+            <Input
+              required
+              placeholder="Job title"
+              value={form.job_title}
+              onChange={(event) => updateForm("job_title", event.target.value)}
+            />
+            <Input
+              required
+              placeholder="Country"
+              value={form.country}
+              onChange={(event) => updateForm("country", event.target.value)}
+            />
+            <Input
+              required
+              placeholder="Department"
+              value={form.department}
+              onChange={(event) => updateForm("department", event.target.value)}
+            />
+            <Input
+              required
+              type="number"
+              min={0}
+              placeholder="Salary"
+              value={form.salary}
+              onChange={(event) => updateForm("salary", event.target.value)}
+            />
           </div>
 
           <Button className="mt-4 w-full" type="submit" disabled={saving}>
-            <Plus />
-            {saving ? "Saving" : "Add employee"}
+            {editingEmployee ? <Save /> : <Plus />}
+            {saving
+              ? "Saving"
+              : editingEmployee
+                ? "Save changes"
+                : "Add employee"}
           </Button>
         </form>
       </section>

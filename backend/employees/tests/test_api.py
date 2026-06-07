@@ -73,8 +73,8 @@ def test_employee_search_uses_default_search_parameter():
     )
 
     assert response.status_code == 200
-    assert len(response.data) == 1
-    assert response.data[0]["email"] == "asha@example.com"
+    assert response.data["count"] == 1
+    assert response.data["results"][0]["email"] == "asha@example.com"
 
 
 @pytest.mark.django_db
@@ -103,8 +103,8 @@ def test_employee_search_supports_q_parameter_and_work_fields():
     )
 
     assert response.status_code == 200
-    assert len(response.data) == 1
-    assert response.data[0]["job_title"] == "Payroll Analyst"
+    assert response.data["count"] == 1
+    assert response.data["results"][0]["job_title"] == "Payroll Analyst"
 
 
 @pytest.mark.django_db
@@ -136,5 +136,46 @@ def test_employee_search_can_be_combined_with_filters():
     )
 
     assert response.status_code == 200
-    assert len(response.data) == 1
-    assert response.data[0]["country"] == "India"
+    assert response.data["count"] == 1
+    assert response.data["results"][0]["country"] == "India"
+
+
+@pytest.mark.django_db
+def test_employee_list_is_paginated():
+    client = APIClient()
+
+    for index in range(25):
+        create_employee(
+            first_name=f"Employee{index}",
+            email=f"employee{index}@example.com"
+        )
+
+    response = client.get("/api/employees/")
+
+    assert response.status_code == 200
+    assert response.data["count"] == 25
+    assert len(response.data["results"]) == 20
+    assert response.data["next"] is not None
+
+
+@pytest.mark.django_db
+def test_update_and_delete_employee_api():
+    client = APIClient()
+    employee = create_employee()
+
+    update_response = client.patch(
+        f"/api/employees/{employee.id}/",
+        {
+            "job_title": "Senior Engineer",
+            "salary": 125000,
+        },
+        format="json"
+    )
+
+    assert update_response.status_code == 200
+    assert update_response.data["job_title"] == "Senior Engineer"
+
+    delete_response = client.delete(f"/api/employees/{employee.id}/")
+
+    assert delete_response.status_code == 204
+    assert not Employee.objects.filter(id=employee.id).exists()

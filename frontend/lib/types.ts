@@ -12,6 +12,13 @@ export type Employee = {
   is_active: boolean;
 };
 
+export type PaginatedResponse<T> = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+};
+
 export type DashboardMetrics = {
   total_employees: number;
   avg_salary: number | null;

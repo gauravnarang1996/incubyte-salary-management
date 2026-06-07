@@ -13,15 +13,19 @@ export async function proxyToBackend(
 ) {
   const incomingUrl = new URL(request.url);
   const headers = new Headers();
-  headers.set("Content-Type", "application/json");
 
   const init: RequestInit = {
     method,
-    headers,
   };
 
   if (!["GET", "HEAD"].includes(method)) {
-    init.body = await request.text();
+    const body = await request.text();
+
+    if (body) {
+      headers.set("Content-Type", "application/json");
+      init.headers = headers;
+      init.body = body;
+    }
   }
 
   const response = await fetch(
