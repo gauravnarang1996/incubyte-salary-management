@@ -1,9 +1,14 @@
-const API_BASE_URL =
-  process.env.DJANGO_API_BASE_URL ?? "http://127.0.0.1:8000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
+if (!API_BASE_URL) {
+  throw new Error("NEXT_PUBLIC_API_URL is not configured");
+}
+
+const normalizedApiBaseUrl = API_BASE_URL.replace(/\/$/, "");
 
 export function backendUrl(path: string, search = "") {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${API_BASE_URL}${normalizedPath}${search}`;
+  return `${normalizedApiBaseUrl}${normalizedPath}${search}`;
 }
 
 export async function proxyToBackend(
